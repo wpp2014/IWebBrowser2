@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="macros.h" />
+    <ClInclude Include="win\current_module.h">
+      <Filter>win</Filter>
+    </ClInclude>
+    <ClInclude Include="win\scoped_variant.h">
+      <Filter>win</Filter>
+    </ClInclude>
+    <ClInclude Include="win\scoped_comptr.h">
+      <Filter>win</Filter>
+    </ClInclude>
+    <ClInclude Include="strings\string_util.h">
+      <Filter>strings</Filter>
+    </ClInclude>
+    <ClInclude Include="strings\stringprintf.h">
+      <Filter>strings</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="win">
+      <UniqueIdentifier>{a5c523f1-b3e7-41c0-831d-f9807b4e28d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="memory">
+      <UniqueIdentifier>{caf8c3e5-69ee-4ba9-a8ff-80c192588a7f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="strings">
+      <UniqueIdentifier>{431d42ff-9b4b-4ed3-906e-35a6a3d3388d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="win\scoped_variant.cc">
+      <Filter>win</Filter>
+    </ClCompile>
+    <ClCompile Include="strings\string_util.cc">
+      <Filter>strings</Filter>
+    </ClCompile>
+    <ClCompile Include="strings\stringprintf.cc">
+      <Filter>strings</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+#include "web_demo_resource.h"
+
+web_demo.html                HTML                "res\\html\\web_demo.html"
+web_demo.css                 HTML                "res\\css\\web_demo.css"
+jquery.js                    HTML                "res\\js\\jquery.js"
+close_on.png                 HTML                "res\\img\\close_on.png"

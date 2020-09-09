@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="browser_control.h" />
+    <ClInclude Include="browser_event_handler.h" />
+    <ClInclude Include="doc_host_ui_handler.h" />
+    <ClInclude Include="browser_feature.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="browser_control.cc" />
+    <ClCompile Include="doc_host_ui_handler.cc" />
+    <ClCompile Include="browser_feature.cc" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cc" />
+    <ClCompile Include="main_window.cc" />
+    <ClCompile Include="constants.cc" />
+    <ClCompile Include="web_demo_doc_host_ui_handler.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="main_window.h" />
+    <ClInclude Include="constants.h" />
+    <ClInclude Include="web_demo_resource.h" />
+    <ClInclude Include="web_demo_doc_host_ui_handler.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="res">
+      <UniqueIdentifier>{eaaf61b9-4cbf-4894-b1c9-7f6fd2b915d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="res\html">
+      <UniqueIdentifier>{abae0484-94e2-4403-9a1b-8f80c30b8949}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="res\js">
+      <UniqueIdentifier>{f952f0d7-2158-45f6-9898-7b2d08820b6f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="res\css">
+      <UniqueIdentifier>{6f87033e-f7cc-4a42-b7bb-82f9f0ad1d39}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="res\js\jquery.js">
+      <Filter>res\js</Filter>
+    </None>
+    <None Include="res\css\web_demo.css">
+      <Filter>res\css</Filter>
+    </None>
+    <None Include="res\html\web_demo.html">
+      <Filter>res\html</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="web_demo.rc">
+      <Filter>res</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
