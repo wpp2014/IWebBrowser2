@@ -16,7 +16,7 @@ namespace ie {
 class BrowserEventHandler;
 
 class BrowserControl : public IOleClientSite
-                     , public IOleInPlaceSite
+                     , public IOleInPlaceSiteWindowless
                      , public IOleInPlaceFrame
                      , public IStorage
                      , public IDispatch {
@@ -58,6 +58,25 @@ class BrowserControl : public IOleClientSite
   virtual HRESULT STDMETHODCALLTYPE ShowObject();
   virtual HRESULT STDMETHODCALLTYPE OnShowWindow(BOOL fShow);
   virtual HRESULT STDMETHODCALLTYPE RequestNewObjectLayout();
+
+  // IOleInPlaceSiteWindowless
+  HRESULT STDMETHODCALLTYPE CanWindowlessActivate() override;
+  HRESULT STDMETHODCALLTYPE GetCapture() override;
+  HRESULT STDMETHODCALLTYPE SetCapture(BOOL fCapture) override;
+  HRESULT STDMETHODCALLTYPE GetFocus() override;
+  HRESULT STDMETHODCALLTYPE SetFocus(BOOL fFocus) override;
+  HRESULT STDMETHODCALLTYPE GetDC(__RPC__in_opt LPCRECT pRect, DWORD grfFlags, __RPC__deref_out_opt HDC *phDC) override;
+  HRESULT STDMETHODCALLTYPE ReleaseDC(__RPC__in HDC hDC) override;
+  HRESULT STDMETHODCALLTYPE InvalidateRect(__RPC__in_opt LPCRECT pRect, BOOL fErase) override;
+  HRESULT STDMETHODCALLTYPE InvalidateRgn(__RPC__in HRGN hRGN, BOOL fErase) override;
+  HRESULT STDMETHODCALLTYPE ScrollRect(INT x, INT y, __RPC__in LPCRECT pRectScroll, __RPC__in LPCRECT pRectClip) override;
+  HRESULT STDMETHODCALLTYPE AdjustRect(__RPC__inout LPRECT prc) override;
+  HRESULT STDMETHODCALLTYPE OnDefWindowMessage(_In_  UINT msg, _In_  WPARAM wParam, _In_  LPARAM lParam, __RPC__out LRESULT *plResult) override;
+
+  // IOleInPlaceSiteEx
+  HRESULT STDMETHODCALLTYPE OnInPlaceActivateEx(__RPC__out BOOL *pfNoRedraw, DWORD dwFlags) override;
+  HRESULT STDMETHODCALLTYPE OnInPlaceDeactivateEx(BOOL fNoRedraw) override;
+  HRESULT STDMETHODCALLTYPE RequestUIActivate() override;
 
   // IOleInPlaceSite
   virtual HRESULT STDMETHODCALLTYPE CanInPlaceActivate();
@@ -201,15 +220,19 @@ class BrowserControl : public IOleClientSite
   HWND browser_wnd_;
   HWND parent_;
 
+  bool in_place_active_;
+
   IOleObject* ole_object_;
   IOleInPlaceObject* ole_in_place_object_;
+
+  IConnectionPoint* connection_point_;
 
   IWebBrowser2* web_browser2_;
 
   // 事件处理对象
   BrowserEventHandler* browser_event_handler_;
 
-  // doc host ui handler
+  // web页面菜单、工具栏、上下文菜单处理对象
   IDocHostUIHandler* doc_host_ui_handler_;
 
   RECT rect_;

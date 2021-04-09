@@ -18,8 +18,10 @@ namespace ie {
 BrowserControl::BrowserControl(HWND parent)
     : browser_wnd_(NULL),
       parent_(parent),
+      in_place_active_(false),
       ole_object_(NULL),
       ole_in_place_object_(NULL),
+      connection_point_(NULL),
       web_browser2_(NULL),
       browser_event_handler_(nullptr),
       doc_host_ui_handler_(nullptr),
@@ -36,7 +38,9 @@ BrowserControl::BrowserControl(HWND parent)
 }
 
 BrowserControl::~BrowserControl() {
-  RegisterEventHandler(false);
+  if (connection_point_) {
+    connection_point_->Unadvise(cookie_);
+  }
 }
 
 void BrowserControl::SetRect(const RECT& rect) {
@@ -47,53 +51,104 @@ void BrowserControl::SetRect(const RECT& rect) {
   size.cy = rect_.bottom - rect_.top;
   ole_object_->SetExtent(DVASPECT_CONTENT, &size);
 
-  if (ole_in_place_object_) {
-    ole_in_place_object_->SetObjectRects(&rect_, &rect_);
-  }
+  ole_in_place_object_->SetObjectRects(&rect_, &rect_);
+
+  ShowWindow(browser_wnd_, SW_NORMAL);
 }
 
 bool BrowserControl::CreateBrowser() {
-  HRESULT hr = ::OleCreate(CLSID_WebBrowser, IID_IOleObject, OLERENDER_DRAW, 0,
-                           this, this, (void**)&ole_object_);
+  HRESULT hr = S_OK;
+
+  base::win::ScopedComPtr<IUnknown> p;
+  if (!p.Create(CLSID_WebBrowser)) {
+    OutputDebugString(L"BrowserControl: Create CLSID_WebBrowser Failed.");
+    return false;
+  }
+
+  hr = p->QueryInterface(&ole_object_);
   if (FAILED(hr)) {
     OutputDebugString(L"BrowserControl: Create OleObject Failed.");
     return false;
   }
 
-  hr = ole_object_->SetClientSite(this);
+  DWORD status;
+  hr = ole_object_->GetMiscStatus(DVASPECT_CONTENT, &status);
   if (FAILED(hr)) {
-    OutputDebugString(L"BrowserControl: OleObject SetClientSite Failed.");
     return false;
   }
 
-  hr= OleSetContainedObject(ole_object_, TRUE);
-  if (FAILED(hr)) {
-    OutputDebugString(L"BrowserControl: OleObject OleSetContainedObject Failed.");
-    return false;
-  }
+  bool set_client_site_first = 0 != (status & OLEMISC_SETCLIENTSITEFIRST);
+  bool invisible_at_runtime = 0 != (status & OLEMISC_INVISIBLEATRUNTIME);
 
-  hr = ole_object_->DoVerb(
-      OLEIVERB_INPLACEACTIVATE, NULL, this, -1, parent_, &rect_);
-  if (FAILED(hr)) {
-    OutputDebugString(L"WebDemo: OleObject DoVerb Failed.");
-    return false;
-  }
-
-  hr = ole_object_->QueryInterface(&web_browser2_);
-  if (FAILED(hr)) {
-    OutputDebugString(L"BrowserControl: OleObject QueryInterface Failed.");
-    return false;
-  }
-
-  RegisterEventHandler(true);
-
-  if (ole_in_place_object_) {
-    hr = ole_in_place_object_->GetWindow(&browser_wnd_);
+  if (set_client_site_first) {
+    hr = ole_object_->SetClientSite(this);
     if (FAILED(hr)) {
-      OutputDebugString(L"BrowserControl: Get Browser Window Failed.");
+      OutputDebugString(L"BrowserControl: OleObject SetClientSite Failed.");
       return false;
     }
   }
+
+  base::win::ScopedComPtr<IPersistStreamInit> pst(p);
+  if (pst) {
+    hr = pst->InitNew();
+    if (FAILED(hr)) {
+      assert(0);
+      return false;
+    }
+  }
+
+  hr = ole_object_->QueryInterface(&ole_in_place_object_);
+  if (FAILED(hr)) {
+    return false;
+  }
+
+  hr = ole_in_place_object_->GetWindow(&browser_wnd_);
+  if (FAILED(hr)) {
+    return false;
+  }
+  ::SetActiveWindow(browser_wnd_);
+
+  RECT parent_rect;
+  ::GetClientRect(parent_, &parent_rect);
+  ole_in_place_object_->SetObjectRects(&parent_rect, &parent_rect);
+
+  if (!invisible_at_runtime) {
+    hr = ole_object_->DoVerb(OLEIVERB_INPLACEACTIVATE, NULL, this, 0, parent_, &parent_rect);
+    if (FAILED(hr)) {
+      return false;
+    }
+
+        hr = ole_object_->DoVerb(OLEIVERB_SHOW, 0, this, 0, browser_wnd_,
+                             &parent_rect);
+  }
+
+  if (!set_client_site_first) {
+    ole_object_->SetClientSite(this);
+  }
+
+  hr = p->QueryInterface(&web_browser2_);
+  if (FAILED(hr)) {
+    return false;
+  }
+
+  base::win::ScopedComPtr<IConnectionPointContainer> cp_container(p);
+  if (!cp_container) {
+    return false;
+  }
+
+  hr = cp_container->FindConnectionPoint(DIID_DWebBrowserEvents2, &connection_point_);
+  if (FAILED(hr)) {
+    return false;
+  }
+  connection_point_->Advise(static_cast<IDispatch*>(this), &cookie_);
+
+  web_browser2_->put_MenuBar(VARIANT_FALSE);
+  web_browser2_->put_AddressBar(VARIANT_FALSE);
+  web_browser2_->put_StatusBar(VARIANT_FALSE);
+  web_browser2_->put_ToolBar(VARIANT_FALSE);
+  web_browser2_->put_Silent(VARIANT_TRUE);
+  web_browser2_->put_RegisterAsBrowser(VARIANT_FALSE);
+  web_browser2_->put_RegisterAsDropTarget(VARIANT_TRUE);
 
   return true;
 }
@@ -163,14 +218,79 @@ HRESULT STDMETHODCALLTYPE BrowserControl::RequestNewObjectLayout() {
   return E_NOTIMPL;
 }
 
+HRESULT STDMETHODCALLTYPE BrowserControl::CanWindowlessActivate() {
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::GetCapture() {
+  return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::SetCapture(BOOL fCapture) {
+  return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::GetFocus() {
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::SetFocus(BOOL fFocus) {
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::GetDC(LPCRECT pRect, DWORD grfFlags, HDC* phDC) {
+  if (!phDC) {
+    return E_INVALIDARG;
+  }
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::ReleaseDC(HDC hDC) {
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::InvalidateRect(LPCRECT pRect, BOOL fErase) {
+  ::InvalidateRect(parent_, nullptr, fErase);
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::InvalidateRgn(HRGN hRGN, BOOL fErase) {
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::ScrollRect(INT x, INT y, LPCRECT pRectScroll, LPCRECT pRectClip) {
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::AdjustRect(LPRECT prc) {
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::OnDefWindowMessage(UINT msg, WPARAM wParam, LPARAM lParam, LRESULT* plResult) {
+  return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::OnInPlaceActivateEx(BOOL* pfNoRedraw, DWORD dwFlags) {
+  if (pfNoRedraw) {
+    *pfNoRedraw = FALSE;
+  }
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::OnInPlaceDeactivateEx(BOOL fNoRedraw) {
+  return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE BrowserControl::RequestUIActivate() {
+  return S_FALSE;
+}
+
 HRESULT STDMETHODCALLTYPE BrowserControl::CanInPlaceActivate() {
   return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE BrowserControl::OnInPlaceActivate() {
-  OleLockRunning(ole_object_, TRUE, FALSE);
-  ole_object_->QueryInterface(&ole_in_place_object_);
-  ole_in_place_object_->SetObjectRects(&rect_, &rect_);
+  in_place_active_ = true;
   return S_OK;
 }
 
@@ -184,6 +304,7 @@ HRESULT STDMETHODCALLTYPE BrowserControl::GetWindowContext(
     __RPC__out LPRECT lprcPosRect,
     __RPC__out LPRECT lprcClipRect,
     __RPC__inout LPOLEINPLACEFRAMEINFO lpFrameInfo) {
+#if 0
   *ppFrame = dynamic_cast<IOleInPlaceFrame*>(this);
   *ppDoc = NULL;
 
@@ -193,6 +314,26 @@ HRESULT STDMETHODCALLTYPE BrowserControl::GetWindowContext(
   lpFrameInfo->fMDIApp = false;
   lpFrameInfo->hwndFrame = parent_;
   lpFrameInfo->haccel = NULL;
+  lpFrameInfo->cAccelEntries = 0;
+
+  return S_OK;
+#endif
+
+  if (!ppFrame || !ppDoc || !lprcPosRect || !lprcClipRect || !lpFrameInfo) {
+    if (ppFrame) {
+      *ppFrame = nullptr;
+    }
+    if (ppDoc) {
+      *ppDoc = nullptr;
+    }
+    return E_INVALIDARG;
+  }
+
+  *ppDoc = *ppFrame = dynamic_cast<IOleInPlaceFrame*>(this);
+
+  lpFrameInfo->fMDIApp = FALSE;
+  lpFrameInfo->hwndFrame = parent_;
+  lpFrameInfo->haccel = nullptr;
   lpFrameInfo->cAccelEntries = 0;
 
   return S_OK;
@@ -208,8 +349,9 @@ BrowserControl::OnUIDeactivate(BOOL fUndoable) {
 }
 
 HRESULT STDMETHODCALLTYPE BrowserControl::OnInPlaceDeactivate() {
-  browser_wnd_ = 0;
-  ole_in_place_object_ = 0;
+  //browser_wnd_ = 0;
+  //ole_in_place_object_ = 0;
+  in_place_active_ = false;
 
   return S_OK;
 }
@@ -455,6 +597,10 @@ HRESULT STDMETHODCALLTYPE BrowserControl::QueryInterface(REFIID riid,
     return S_OK;
   } else if (riid == IID_IOleClientSite) {
     *ppvObject = dynamic_cast<IOleClientSite*>(this);
+  } else if (riid == IID_IOleInPlaceSiteWindowless) {
+    *ppvObject = dynamic_cast<IOleInPlaceSiteWindowless*>(this);
+  } else if (riid == IID_IOleInPlaceSiteEx) {
+    *ppvObject = dynamic_cast<IOleInPlaceSiteEx*>(this);
   } else if (riid == IID_IOleInPlaceSite) {
     *ppvObject = dynamic_cast<IOleInPlaceSite*>(this);
   } else if (riid == IID_IOleInPlaceFrame) {
