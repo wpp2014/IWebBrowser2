@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <exdisp.h>
 #include <mshtmhst.h>
+#include <wrl/client.h>
 
 #include <atomic>
 
@@ -40,7 +41,7 @@ class BrowserControl : public IOleClientSite
   // 获取IWebBrowser2窗口句柄
   HWND GetBrowserWnd() const { return browser_wnd_; }
   // 获取IwebBrowser2对象
-  IWebBrowser2* GetBrowserObject() const { return web_browser2_; }
+  IWebBrowser2* GetBrowserObject() const { return web_browser2_.Get(); }
 
  protected:
   bool CreateBrowser();
@@ -222,12 +223,12 @@ class BrowserControl : public IOleClientSite
 
   bool in_place_active_;
 
-  IOleObject* ole_object_;
-  IOleInPlaceObject* ole_in_place_object_;
+  Microsoft::WRL::ComPtr<IOleObject> ole_object_;
+  Microsoft::WRL::ComPtr<IOleInPlaceObject> ole_in_place_object_;
 
-  IConnectionPoint* connection_point_;
+  Microsoft::WRL::ComPtr<IConnectionPoint> connection_point_;
 
-  IWebBrowser2* web_browser2_;
+  Microsoft::WRL::ComPtr<IWebBrowser2> web_browser2_;
 
   // 事件处理对象
   BrowserEventHandler* browser_event_handler_;

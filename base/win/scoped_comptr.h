@@ -10,7 +10,16 @@ template<class T>
 class ScopedComPtr {
  public:
   ScopedComPtr() : ptr_(nullptr) {}
-  explicit ScopedComPtr(T* ptr) : ptr_(ptr) {}
+
+  // explicit ScopedComPtr(T* ptr) : ptr_(ptr) {}
+
+  explicit ScopedComPtr(IUnknown* unk) {
+    HRESULT hr = unk->QueryInterface(&ptr_);
+    if (FAILED(hr)) {
+      ptr_ = nullptr;
+    }
+  }
+
   ~ScopedComPtr() {
     if (ptr_) {
       ptr_->Release();

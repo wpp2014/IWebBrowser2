@@ -9,9 +9,10 @@
 #include <string>
 #include <vector>
 
-#include "base/win/scoped_comptr.h"
 #include "base/win/scoped_variant.h"
 #include "iwebbrowser2/browser_event_handler.h"
+
+using Microsoft::WRL::ComPtr;
 
 namespace ie {
 
@@ -19,10 +20,6 @@ BrowserControl::BrowserControl(HWND parent)
     : browser_wnd_(NULL),
       parent_(parent),
       in_place_active_(false),
-      ole_object_(NULL),
-      ole_in_place_object_(NULL),
-      connection_point_(NULL),
-      web_browser2_(NULL),
       browser_event_handler_(nullptr),
       doc_host_ui_handler_(nullptr),
       rect_({0, 0, 0, 0}),
@@ -59,13 +56,14 @@ void BrowserControl::SetRect(const RECT& rect) {
 bool BrowserControl::CreateBrowser() {
   HRESULT hr = S_OK;
 
-  base::win::ScopedComPtr<IUnknown> p;
-  if (!p.Create(CLSID_WebBrowser)) {
+  ComPtr<IUnknown> p;
+  hr = CoCreateInstance(CLSID_WebBrowser, NULL, CLSCTX_ALL, IID_PPV_ARGS(p.GetAddressOf()));
+  if (FAILED(hr)) {
     OutputDebugString(L"BrowserControl: Create CLSID_WebBrowser Failed.");
     return false;
   }
 
-  hr = p->QueryInterface(&ole_object_);
+  hr = p.As(&ole_object_);
   if (FAILED(hr)) {
     OutputDebugString(L"BrowserControl: Create OleObject Failed.");
     return false;
@@ -88,17 +86,21 @@ bool BrowserControl::CreateBrowser() {
     }
   }
 
-  base::win::ScopedComPtr<IPersistStreamInit> pst(p);
-  if (pst) {
-    hr = pst->InitNew();
-    if (FAILED(hr)) {
-      assert(0);
-      return false;
-    }
+  ComPtr<IPersistStreamInit> pst;
+  hr = p.As(&pst);
+  if (FAILED(hr)) {
+    assert(false);
+    return false;
+  }
+  hr = pst->InitNew();
+  if (FAILED(hr)) {
+    assert(false);
+    return false;
   }
 
-  hr = ole_object_->QueryInterface(&ole_in_place_object_);
+  hr = ole_object_.As(&ole_in_place_object_);
   if (FAILED(hr)) {
+    assert(false);
     return false;
   }
 
@@ -126,17 +128,20 @@ bool BrowserControl::CreateBrowser() {
     ole_object_->SetClientSite(this);
   }
 
-  hr = p->QueryInterface(&web_browser2_);
+  hr = p.As(&web_browser2_);
   if (FAILED(hr)) {
+    assert(false);
     return false;
   }
 
-  base::win::ScopedComPtr<IConnectionPointContainer> cp_container(p);
-  if (!cp_container) {
+  ComPtr<IConnectionPointContainer> cp_container;
+  hr = p.As(&cp_container);
+  if (FAILED(hr)) {
+    assert(false);
     return false;
   }
 
-  hr = cp_container->FindConnectionPoint(DIID_DWebBrowserEvents2, &connection_point_);
+  hr = cp_container->FindConnectionPoint(DIID_DWebBrowserEvents2, connection_point_.GetAddressOf());
   if (FAILED(hr)) {
     return false;
   }
@@ -158,21 +163,21 @@ bool BrowserControl::RegisterEventHandler(bool is_advise) {
     return false;
   }
 
-  base::win::ScopedComPtr<IWebBrowser2> web_browser2;
-  base::win::ScopedComPtr<IConnectionPointContainer> cpc;
-  base::win::ScopedComPtr<IConnectionPoint> cp;
+  ComPtr<IWebBrowser2> web_browser2;
+  ComPtr<IConnectionPointContainer> cpc;
+  ComPtr<IConnectionPoint> cp;
 
-  HRESULT hr = ole_object_->QueryInterface(&web_browser2);
+  HRESULT hr = ole_object_.As(&web_browser2);
   if (FAILED(hr)) {
     return false;
   }
 
-  hr = web_browser2->QueryInterface(&cpc);
+  hr = web_browser2.As(&cpc);
   if (FAILED(hr)) {
     return false;
   }
 
-  hr = cpc->FindConnectionPoint(DIID_DWebBrowserEvents2, &cp);
+  hr = cpc->FindConnectionPoint(DIID_DWebBrowserEvents2, cp.GetAddressOf());
   if (FAILED(hr)) {
     return false;
   }
@@ -304,21 +309,6 @@ HRESULT STDMETHODCALLTYPE BrowserControl::GetWindowContext(
     __RPC__out LPRECT lprcPosRect,
     __RPC__out LPRECT lprcClipRect,
     __RPC__inout LPOLEINPLACEFRAMEINFO lpFrameInfo) {
-#if 0
-  *ppFrame = dynamic_cast<IOleInPlaceFrame*>(this);
-  *ppDoc = NULL;
-
-  *lprcPosRect = rect_;
-  *lprcClipRect = *lprcPosRect;
-
-  lpFrameInfo->fMDIApp = false;
-  lpFrameInfo->hwndFrame = parent_;
-  lpFrameInfo->haccel = NULL;
-  lpFrameInfo->cAccelEntries = 0;
-
-  return S_OK;
-#endif
-
   if (!ppFrame || !ppDoc || !lprcPosRect || !lprcClipRect || !lpFrameInfo) {
     if (ppFrame) {
       *ppFrame = nullptr;
@@ -349,8 +339,6 @@ BrowserControl::OnUIDeactivate(BOOL fUndoable) {
 }
 
 HRESULT STDMETHODCALLTYPE BrowserControl::OnInPlaceDeactivate() {
-  //browser_wnd_ = 0;
-  //ole_in_place_object_ = 0;
   in_place_active_ = false;
 
   return S_OK;
