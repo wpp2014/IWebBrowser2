@@ -60,6 +60,7 @@ bool MainWindow::Initialize() {
   RegisterClassEx(&wcex);
 
   DWORD style = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+  DWORD ex_style = WS_EX_LAYERED;
   hwnd_ = CreateWindowEx(0,
                          kWindowClass,
                          kWindowTitle,
@@ -97,6 +98,11 @@ bool MainWindow::Initialize() {
 
   ShowWindow(hwnd_, SW_SHOWNORMAL);
   UpdateWindow(hwnd_);
+
+  SetWindowLong(hwnd_,
+                GWL_EXSTYLE,
+                GetWindowLong(hwnd_, GWL_EXSTYLE) | WS_EX_LAYERED);
+  SetLayeredWindowAttributes(hwnd_, RGB(0xA1, 0xA1, 0xA1), 0, LWA_COLORKEY);
 
   return true;
 }
@@ -137,7 +143,7 @@ void MainWindow::DocumentComplete(IDispatch* i_dispatch, VARIANT*& url) {
   if (url && url->vt == VT_BSTR && url->bstrVal) {
     std::wstring url_str(url->bstrVal, SysStringLen(url->bstrVal));
     if (url_str == kAboutBlankURL) {
-      base::win::ScopedVariant new_url(L"http://172.18.15.219/html/iwebbrowser-demo/1.html");
+      base::win::ScopedVariant new_url(L"https://wangpengpeng.icu/alpha/");
       browser_object_->Navigate2(new_url.AsInput(), NULL, NULL, NULL, NULL);
     }
   }
